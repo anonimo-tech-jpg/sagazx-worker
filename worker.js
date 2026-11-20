@@ -7,7 +7,6 @@ export default {
 
       server.accept();
 
-      // Armazena o WebSocket do jogador na memória
       if (!globalThis.clients) globalThis.clients = new Map();
       
       server.addEventListener("message", (msg) => {
@@ -15,7 +14,6 @@ export default {
           const data = JSON.parse(msg.data);
           
           if (data.type === "register") {
-            // Salva quem é o jogador e onde ele está
             globalThis.clients.set(data.userId, {
               ws: server,
               nome: data.nome,
@@ -24,7 +22,7 @@ export default {
               nomeJogo: data.nomeJogo
             });
 
-            // Avisa TODOS os outros jogadores que esse cara entrou
+            // 1. Avisa os outros que você entrou
             broadcast(JSON.stringify({
               type: "player_joined",
               userId: data.userId,
@@ -33,11 +31,27 @@ export default {
               placeId: data.placeId,
               nomeJogo: data.nomeJogo
             }), data.userId);
+
+            // 2. NOVO: Manda para VOCÊ a lista de quem já estava online
+            const online = [];
+            for (const [uid, c] of globalThis.clients.entries()) {
+              if (uid !== data.userId) {
+                online.push({
+                  userId: Number(uid),
+                  nome: c.nome,
+                  jobId: c.jobId,
+                  placeId: c.placeId,
+                  nomeJogo: c.nomeJogo
+                });
+              }
+            }
+            if (online.length > 0) {
+              server.send(JSON.stringify({ type: "online_list", players: online }));
+            }
           }
         } catch (e) {}
       });
 
-      // Quando o jogador sai
       server.addEventListener("close", () => {
         for (const [userId, client] of globalThis.clients.entries()) {
           if (client.ws === server) {
