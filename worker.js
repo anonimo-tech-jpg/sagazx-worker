@@ -1,7 +1,6 @@
 export default {
   async fetch(request, env, ctx) {
     const upgradeHeader = request.headers.get("Upgrade");
-    
     if (upgradeHeader !== "websocket") {
       return new Response("Expected Upgrade: websocket", { status: 426 });
     }
@@ -17,9 +16,12 @@ export default {
         const data = JSON.parse(msg.data);
         
         if (data.type === "register") {
-          globalThis.clients.set(data.userId, {
+          // Força o userId a ser string para evitar erros de tipo
+          const uidStr = String(data.userId);
+          
+          globalThis.clients.set(uidStr, {
             ws: server,
-            userId: data.userId,
+            userId: Number(data.userId),
             nome: data.nome,
             jobId: data.jobId,
             placeId: data.placeId,
@@ -27,44 +29,33 @@ export default {
           });
 
           // ==========================================
-          // TESTE: Manda um "eco" de volta para quem acabou de entrar
+          // Manda um "eco" só pra confirmar que tá vivo
           // ==========================================
           server.send(JSON.stringify({ 
             type: "ping", 
-            mensagem: "Worker recebeu seu registro com sucesso!" 
+            mensagem: "Worker OK. Total online: " + globalThis.clients.size 
           }));
 
-          // Avisa os outros do MESMO SERVIDOR
-          for (const [uid, c] of globalThis.clients.entries()) {
-            if (uid !== data.userId && c.jobId === data.jobId) {
-              try {
-                c.ws.send(JSON.stringify({
-                  type: "player_joined",
-                  userId: data.userId,
-                  nome: data.nome,
-                  jobId: data.jobId,
-                  placeId: data.placeId,
-                  nomeJogo: data.nomeJogo
-                }));
-              } catch (e) {}
-            }
-          }
-
-          // Manda a lista de quem já estava no MESMO SERVIDOR
+          // Monta a lista de TODO MUNDO online
           const online = [];
           for (const [uid, c] of globalThis.clients.entries()) {
-            if (uid !== data.userId && c.jobId === data.jobId) {
-              online.push({
-                userId: c.userId,
-                nome: c.nome,
-                jobId: c.jobId,
-                placeId: c.placeId,
-                nomeJogo: c.nomeJogo
-              });
-            }
+            online.push({
+              userId: c.userId,
+              nome: c.nome,
+              jobId: c.jobId,
+              placeId: c.placeId,
+              nomeJogo: c.nomeJogo
+            });
           }
-          if (online.length > 0) {
-            server.send(JSON.stringify({ type: "online_list", players: online }));
+
+          // Envia a lista atualizada para todos os jogadores conectados
+          for (const [uid, c] of globalThis.clients.entries()) {
+            try {
+              c.ws.send(JSON.stringify({ 
+                type: "online_list", 
+                players: online 
+              }));
+            } catch (e) {}
           }
         }
       } catch (e) {}
@@ -74,10 +65,21 @@ export default {
       for (const [userId, client] of globalThis.clients.entries()) {
         if (client.ws === server) {
           globalThis.clients.delete(userId);
+          
+          // Reenvia a lista atualizada para quem ficou
+          const online = [];
           for (const [uid, c] of globalThis.clients.entries()) {
-            if (uid !== userId && c.jobId === client.jobId) {
-              try { c.ws.send(JSON.stringify({ type: "player_left", userId: Number(userId) })); } catch(e) {}
-            }
+            online.push({
+              userId: c.userId,
+              nome: c.nome,
+              jobId: c.jobId,
+              placeId: c.placeId,
+              nomeJogo: c.nomeJogo
+            });
+          }
+          
+          for (const [uid, c] of globalThis.clients.entries()) {
+            try { c.ws.send(JSON.stringify({ type: "online_list", players: online })); } catch(e) {}
           }
           break;
         }
