@@ -2,11 +2,10 @@ name = "sagazx-worker"
 main = "worker.js"
 compatibility_date = "2026-11-20"
 
-# Adicione essas linhas:
 [[durable_objects.bindings]]
 name = "TAG_ROOM"
 class_name = "TagRoom"
 
 [[migrations]]
 tag = "v1"
-new_classes = ["TagRoom"]
+new_sqlite_classes = ["TagRoom"]
