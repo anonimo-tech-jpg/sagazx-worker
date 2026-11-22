@@ -6,7 +6,6 @@ export default {
       return new Response("Expected Upgrade: websocket", { status: 426 });
     }
 
-    // Pega a "Sala Global" (todos caem na mesma)
     const id = env.TAG_ROOM.idFromName("sala_principal");
     const stub = env.TAG_ROOM.get(id);
     
@@ -18,7 +17,7 @@ export default {
 export class TagRoom {
   constructor(state, env) {
     this.state = state;
-    this.sessions = []; // Guarda os WebSockets de todos
+    this.sessions = [];
   }
 
   async fetch(request) {
@@ -39,34 +38,28 @@ export class TagRoom {
         const data = JSON.parse(msg.data);
         
         if (data.type === "register") {
-          // Salva os dados do player no próprio WebSocket
           websocket.userId = data.userId;
           websocket.nome = data.nome;
           websocket.jobId = data.jobId;
           websocket.placeId = data.placeId;
           websocket.nomeJogo = data.nomeJogo;
 
-          // Manda um "Ping" de confirmação
           websocket.send(JSON.stringify({ type: "ping", mensagem: "Conectado na Sala!" }));
           
-          // Atualiza a lista de todo mundo
           this.broadcast();
         }
       } catch (e) {}
     });
 
     websocket.addEventListener("close", () => {
-      // Remove quem saiu e atualiza a lista
       this.sessions = this.sessions.filter(s => s !== websocket);
       this.broadcast();
     });
   }
 
-  // Avisa todo mundo quem está online (filtrado pelo mesmo jogo/servidor)
   broadcast() {
     const players = [];
     
-    // Pega todos que já se registraram
     for (const s of this.sessions) {
       if (s.userId) {
         players.push({
@@ -79,7 +72,6 @@ export class TagRoom {
       }
     }
 
-    // Manda a lista atualizada para todos
     for (const s of this.sessions) {
       try {
         s.send(JSON.stringify({ type: "online_list", players: players }));
