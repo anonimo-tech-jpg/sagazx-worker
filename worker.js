@@ -17,7 +17,6 @@ export default {
         const data = JSON.parse(msg.data);
         
         if (data.type === "register") {
-          // Salva quem entrou e em qual servidor (jobId)
           globalThis.clients.set(data.userId, {
             ws: server,
             userId: data.userId,
@@ -27,7 +26,15 @@ export default {
             nomeJogo: data.nomeJogo
           });
 
-          // Avisa os outros do MESMO SERVIDOR que você entrou
+          // ==========================================
+          // TESTE: Manda um "eco" de volta para quem acabou de entrar
+          // ==========================================
+          server.send(JSON.stringify({ 
+            type: "ping", 
+            mensagem: "Worker recebeu seu registro com sucesso!" 
+          }));
+
+          // Avisa os outros do MESMO SERVIDOR
           for (const [uid, c] of globalThis.clients.entries()) {
             if (uid !== data.userId && c.jobId === data.jobId) {
               try {
@@ -43,7 +50,7 @@ export default {
             }
           }
 
-          // Manda para VOCÊ a lista de quem já estava no MESMO SERVIDOR
+          // Manda a lista de quem já estava no MESMO SERVIDOR
           const online = [];
           for (const [uid, c] of globalThis.clients.entries()) {
             if (uid !== data.userId && c.jobId === data.jobId) {
@@ -67,7 +74,6 @@ export default {
       for (const [userId, client] of globalThis.clients.entries()) {
         if (client.ws === server) {
           globalThis.clients.delete(userId);
-          // Avisa os outros do mesmo servidor que você saiu
           for (const [uid, c] of globalThis.clients.entries()) {
             if (uid !== userId && c.jobId === client.jobId) {
               try { c.ws.send(JSON.stringify({ type: "player_left", userId: Number(userId) })); } catch(e) {}
